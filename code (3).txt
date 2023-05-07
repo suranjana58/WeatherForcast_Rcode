@@ -1,0 +1,187 @@
+#problem 5
+setwd('C:/Users/xiaoh/Documents/xh/2022fall/MSA 8190 Statistical foundation/Homework and practice/')
+library(readxl)
+data<- read.csv(file="Bias_correction_ucl.csv")
+
+#removing the missing values
+data<-na.omit(data)
+
+#order the data by date
+data<-data[order(data$Date),]
+
+#choose the dependent and independent variables
+data1<-data[,c(3:24)]
+
+#correlation table
+res<-cor(data1)
+res<-round(res,2)   #the variable 'lon' is not correlated with Next_Tmax.
+
+#describe the data
+summary(data1)
+
+#scatter plot
+plot(data1$Next_Tmax ~ data1$Present_Tmax) #linear
+plot(data1$Next_Tmax ~ data1$Present_Tmin) #linear
+plot(data1$Next_Tmax ~ data1$LDAPS_RHmin)  #linear
+plot(data1$Next_Tmax ~ data1$LDAPS_RHmax)  #linear
+plot(data1$Next_Tmax ~ data1$LDAPS_Tmax_lapse) #linear
+plot(data1$Next_Tmax ~ data1$LDAPS_Tmin_lapse) #linear
+plot(data1$Next_Tmax ~ data1$LDAPS_WS)         #u shape
+plot(data1$Next_Tmax ~ data1$LDAPS_LH)
+plot(data1$Next_Tmax ~ data1$LDAPS_CC1)      #linear
+plot(data1$Next_Tmax ~ data1$LDAPS_CC2)     #linear
+plot(data1$Next_Tmax ~ data1$LDAPS_CC3)     #linear
+plot(data1$Next_Tmax ~ data1$LDAPS_CC4)     #linear
+plot(data1$Next_Tmax ~ data1$LDAPS_PPT1)
+plot(data1$Next_Tmax ~ data1$LDAPS_PPT2)
+plot(data1$Next_Tmax ~ data1$LDAPS_PPT3)
+plot(data1$Next_Tmax ~ data1$LDAPS_PPT4)
+plot(data1$Next_Tmax ~ data1$lat)
+plot(data1$Next_Tmax ~ data1$lon)
+plot(data1$Next_Tmax ~ data1$DEM)
+plot(data1$Next_Tmax ~ data1$Slope)
+plot(data1$Next_Tmax ~ data1$Solar.radiation)  #u shape
+
+##############################################
+#            model 1
+# split data
+num_train<-ceiling(length(data1$lat)*0.6)
+data_train<-data1[c(1:num_train),]
+num_valid<-ceiling(length(data1$lat)*0.2)
+data_valid<-data1[c((num_train+1):(num_train+num_valid)),]
+data_test<-data1[c((num_train+num_valid+1):(length(data1$lat))),]
+num_test<-length(data1$lat)-num_train-num_valid
+
+#linear regression (basic)
+reg1<-lm(Next_Tmax~Present_Tmax+Present_Tmin+LDAPS_RHmin+LDAPS_RHmax+LDAPS_Tmax_lapse+
+           LDAPS_WS+LDAPS_LH+LDAPS_CC1+LDAPS_CC2+LDAPS_CC3+LDAPS_CC4+LDAPS_PPT1+LDAPS_PPT2+
+           LDAPS_PPT3+LDAPS_PPT4+lat+lon+DEM+Slope+Solar.radiation, data=data_train)
+
+summary(reg1)
+
+#check residuals in reg1
+prediction<-predict(reg1, newdata = data_train)
+residual<-data_train$Next_Tmax-prediction
+qqnorm(residual)              #Q-Q
+qqline(residual)
+
+plot(residual ~ prediction,xlab='y_hat')  
+
+#RMSE for valid data
+prediction<-predict(reg1, newdata = data_valid)
+RMSE<-sqrt(sum((data_valid$Next_Tmax-prediction)*(data_valid$Next_Tmax-prediction))/num_valid)
+RMSE
+
+#RMSE for test data
+prediction<-predict(reg1, newdata = data_test)
+RMSE<-sqrt(sum((data_test$Next_Tmax-prediction)*(data_test$Next_Tmax-prediction))/num_test)
+RMSE
+
+#############################################################
+#               model 2
+
+#adding new variables
+data1$LDAPS_WS_new<-data1$LDAPS_WS*data1$LDAPS_WS
+data1$Solar.radiation_new<-data1$Solar.radiation*data1$Solar.radiation
+
+#split data
+num_train<-ceiling(length(data1$lat)*0.6)
+data_train<-data1[c(1:num_train),]
+num_valid<-ceiling(length(data1$lat)*0.2)
+data_valid<-data1[c((num_train+1):(num_train+num_valid)),]
+data_test<-data1[c((num_train+num_valid+1):(length(data1$lat))),]
+num_test<-length(data1$lat)-num_train-num_valid
+
+reg2<-lm(Next_Tmax~Present_Tmax+Present_Tmin+LDAPS_RHmin+LDAPS_RHmax+LDAPS_Tmax_lapse+
+           LDAPS_WS+LDAPS_LH+LDAPS_CC1+LDAPS_CC2+LDAPS_CC3+LDAPS_CC4+LDAPS_PPT1+LDAPS_PPT2+
+           LDAPS_PPT3+LDAPS_PPT4+lat+lon+DEM+Slope+Solar.radiation+
+           LDAPS_WS_new+Solar.radiation_new, data=data_train)
+
+summary(reg2)
+
+#check residuals in reg2
+prediction<-predict(reg2, newdata = data_train)
+residual<-data_train$Next_Tmax-prediction
+qqnorm(residual)              #Q-Q
+qqline(residual)
+plot(residual ~ prediction,xlab='y_hat')  
+
+#RMSE for valid data
+prediction<-predict(reg2, newdata = data_valid)
+RMSE<-sqrt(sum((data_valid$Next_Tmax-prediction)*(data_valid$Next_Tmax-prediction))/num_valid)
+RMSE
+
+#RMSE for test data
+prediction<-predict(reg2, newdata = data_test)
+RMSE<-sqrt(sum((data_test$Next_Tmax-prediction)*(data_test$Next_Tmax-prediction))/num_test)
+RMSE
+
+##################################################################
+#                       model 3
+#remove insignificant variables
+#LDAPS_WS,LDAPS_PPT3,LDAPS_PPT4,Solar.radiation,Solar.radiation_new
+reg3<-lm(Next_Tmax~Present_Tmax+Present_Tmin+LDAPS_RHmin+LDAPS_RHmax+LDAPS_Tmax_lapse+
+           LDAPS_LH+LDAPS_CC1+LDAPS_CC2+LDAPS_CC3+LDAPS_CC4+LDAPS_PPT1+LDAPS_PPT2+
+           lat+lon+DEM+Slope+Solar.radiation_new+
+           LDAPS_WS_new, data=data_train)
+
+summary(reg3)
+
+#check residuals in reg3
+prediction<-predict(reg3, newdata = data_train)
+residual<-data_train$Next_Tmax-prediction
+qqnorm(residual) #Q-Q
+qqline(residual)
+plot(residual ~ prediction,xlab='y_hat')  
+
+#RMSE for valid data
+prediction<-predict(reg3, newdata = data_valid)
+RMSE<-sqrt(sum((data_valid$Next_Tmax-prediction)*(data_valid$Next_Tmax-prediction))/num_valid)
+RMSE
+
+#RMSE for test data
+prediction<-predict(reg3, newdata = data_test)
+RMSE<-sqrt(sum((data_test$Next_Tmax-prediction)*(data_test$Next_Tmax-prediction))/num_test)
+RMSE
+
+
+####################################################################
+#                  model 4
+library(fastDummies)
+data2<-dummy_cols(data, select_columns = c("station"),remove_first_dummy = TRUE)
+data2<-select(data2, -c('station','Date','lat','lon','DEM','Slope','Next_Tmin'))
+
+#adding new variables
+data2$LDAPS_WS_new<-data2$LDAPS_WS*data2$LDAPS_WS
+data2$Solar.radiation_new<-data2$Solar.radiation*data2$Solar.radiation
+
+
+# split data
+num_train<-ceiling(length(data2$Next_Tmax)*0.6)
+data_train<-data2[c(1:num_train),]
+num_valid<-ceiling(length(data2$Next_Tmax)*0.2)
+data_valid<-data2[c((num_train+1):(num_train+num_valid)),]
+data_test<-data2[c((num_train+num_valid+1):(length(data2$Next_Tmax))),]
+num_test<-length(data2$Next_Tmax)-num_train-num_valid
+
+reg4<-lm(Next_Tmax ~ . -Present_Tmin -LDAPS_WS -LDAPS_PPT3 -LDAPS_PPT4 -Solar.radiation,data=data_train)
+
+summary(reg4)
+
+#RMSE for valid data
+prediction<-predict(reg4, newdata = data_valid)
+RMSE<-sqrt(sum((data_valid$Next_Tmax-prediction)*(data_valid$Next_Tmax-prediction))/num_valid)
+RMSE
+
+#RMSE for test data
+prediction<-predict(reg4, newdata = data_test)
+RMSE<-sqrt(sum((data_test$Next_Tmax-prediction)*(data_test$Next_Tmax-prediction))/num_test)
+RMSE
+
+
+#check residuals in reg4
+prediction<-predict(reg4, newdata = data_train)
+residual<-data_train$Next_Tmax-prediction
+qqnorm(residual) #Q-Q
+qqline(residual)
+plot(residual ~ prediction,xlab='y_hat')  
